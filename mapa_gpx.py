@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 # 1️⃣ Leer archivo GPX
 # ===============================
 
-with open("ruta.gpx", "r", encoding="utf-8") as archivo:
+with open("rutaSTAR.gpx", "r", encoding="utf-8") as archivo:
     gpx = gpxpy.parse(archivo)
 
 latitudes = []
@@ -40,12 +40,39 @@ folium.PolyLine(
 ).add_to(mapa_2d)
 
 # ===============================
-# 3️⃣ Agregar 5 fotografías
+# 3️⃣ Agregar 5 fotografías (CON LINK)
 # ===============================
 
 carpeta_fotos = "fotos"
 imagenes = sorted(os.listdir(carpeta_fotos))[:5]
 
+indices = [
+    int(len(latitudes)*0.1),
+    int(len(latitudes)*0.3),
+    int(len(latitudes)*0.5),
+    int(len(latitudes)*0.7),
+    int(len(latitudes)*0.9)
+]
+
+for i, indice in enumerate(indices):
+    nombre_imagen = imagenes[i]
+    ruta_relativa = f"fotos/{nombre_imagen}"  # importante: ruta relativa
+
+    html = f"""
+        <h4>Foto {i+1}</h4>
+        <a href="{ruta_relativa}" target="_blank">
+            Abrir imagen en nueva ventana
+        </a>
+    """
+
+    popup = folium.Popup(html, max_width=300)
+
+    folium.Marker(
+        location=[latitudes[indice], longitudes[indice]],
+        popup=popup,
+        icon=folium.Icon(color="red", icon="camera")
+    ).add_to(mapa_2d)
+    
 # Seleccionamos 5 puntos equidistantes
 indices = [
     int(len(latitudes)*0.1),
