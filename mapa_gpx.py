@@ -2,9 +2,37 @@ import gpxpy
 import folium
 import os
 import plotly.graph_objects as go
+import exifread
 
 # =====================================
-# 1️⃣ LEER ARCHIVO GPX
+# FUNCIÓN PARA CONVERTIR EXIF A DECIMAL
+# =====================================
+
+def convertir_a_decimal(valor):
+    grados = float(valor.values[0].num) / float(valor.values[0].den)
+    minutos = float(valor.values[1].num) / float(valor.values[1].den)
+    segundos = float(valor.values[2].num) / float(valor.values[2].den)
+    return grados + (minutos / 60.0) + (segundos / 3600.0)
+
+def obtener_coordenadas_exif(ruta_imagen):
+    with open(ruta_imagen, 'rb') as f:
+        tags = exifread.process_file(f)
+
+        if "GPS GPSLatitude" in tags and "GPS GPSLongitude" in tags:
+            lat = convertir_a_decimal(tags["GPS GPSLatitude"])
+            lon = convertir_a_decimal(tags["GPS GPSLongitude"])
+
+            if tags["GPS GPSLatitudeRef"].values != 'N':
+                lat = -lat
+            if tags["GPS GPSLongitudeRef"].values != 'E':
+                lon = -lon
+
+            return lat, lon
+        else:
+            return None, None
+
+# =====================================
+# 1️⃣ LEER GPX
 # =====================================
 
 with open("rutaSTAR.gpx", "r", encoding="utf-8") as archivo:
@@ -21,14 +49,8 @@ for track in gpx.tracks:
             longitudes.append(point.longitude)
             alturas.append(point.elevation if point.elevation else 0)
 
-if len(latitudes) == 0:
-    print("No se encontraron puntos en el archivo GPX.")
-    exit()
-
-print("GPX cargado correctamente.")
-
 # =====================================
-# 2️⃣ CREAR MAPA 2D
+# 2️⃣ MAPA 2D
 # =====================================
 
 mapa_2d = folium.Map(
@@ -37,69 +59,52 @@ mapa_2d = folium.Map(
     tiles="OpenStreetMap"
 )
 
-# Dibujar la ruta
+# Dibujar ruta
 folium.PolyLine(
     list(zip(latitudes, longitudes)),
     color="blue",
     weight=4
 ).add_to(mapa_2d)
 
-print("Ruta dibujada en mapa 2D.")
-
 # =====================================
-# 3️⃣ AGREGAR 5 FOTOGRAFÍAS COMO LINK
+# 3️⃣ AGREGAR FOTOS EN SU POSICIÓN REAL
 # =====================================
 
 carpeta_fotos = "fotos"
-
-if not os.path.exists(carpeta_fotos):
-    print("La carpeta 'fotos' no existe.")
-    exit()
-
 imagenes = sorted(os.listdir(carpeta_fotos))[:5]
 
-if len(imagenes) < 5:
-    print("Debe haber al menos 5 imágenes en la carpeta 'fotos'.")
-    exit()
+for imagen in imagenes:
 
-# Elegimos 5 puntos distribuidos en la ruta
-indices = [
-    int(len(latitudes) * 0.1),
-    int(len(latitudes) * 0.3),
-    int(len(latitudes) * 0.5),
-    int(len(latitudes) * 0.7),
-    int(len(latitudes) * 0.9)
-]
+    ruta_imagen = os.path.join(carpeta_fotos, imagen)
+    lat, lon = obtener_coordenadas_exif(ruta_imagen)
 
-for i, indice in enumerate(indices):
+    if lat is not None and lon is not None:
 
-    nombre_imagen = imagenes[i]
-    ruta_relativa = f"fotos/{nombre_imagen}"
+        html = f"""
+            <h4>{imagen}</h4>
+            <a href="{ruta_imagen}" target="_blank">
+                🔍 Ver imagen completa
+            </a>
+        """
 
-    html = f"""
-        <h4>Foto {i+1}</h4>
-        <p>Punto de la ruta</p>
-        <a href="{ruta_relativa}" target="_blank">
-            🔍 Abrir imagen en nueva ventana
-        </a>
-    """
+        popup = folium.Popup(html, max_width=300)
 
-    popup = folium.Popup(html, max_width=300)
+        folium.Marker(
+            location=[lat, lon],
+            popup=popup,
+            icon=folium.Icon(color="red", icon="camera")
+        ).add_to(mapa_2d)
 
-    folium.Marker(
-        location=[latitudes[indice], longitudes[indice]],
-        popup=popup,
-        icon=folium.Icon(color="red", icon="camera")
-    ).add_to(mapa_2d)
+        print(f"Foto {imagen} ubicada en: {lat}, {lon}")
 
-print("Fotografías agregadas como links.")
+    else:
+        print(f"La imagen {imagen} no tiene datos GPS.")
 
-# Guardar mapa 2D
 mapa_2d.save("mapa_2D.html")
-print("Mapa 2D guardado como 'mapa_2D.html'.")
+print("Mapa 2D generado correctamente.")
 
 # =====================================
-# 4️⃣ CREAR MAPA 3D
+# 4️⃣ MAPA 3D
 # =====================================
 
 fig = go.Figure()
@@ -123,6 +128,4 @@ fig.update_layout(
 )
 
 fig.write_html("mapa_3D.html")
-
-print("Mapa 3D guardado como 'mapa_3D.html'.")
-print("Proceso finalizado correctamente.")
+print("Mapa 3D generado correctamente.")
