@@ -82,7 +82,7 @@ for imagen in imagenes:
 
         html = f"""
             <h4>{imagen}</h4>
-            <a href="{ruta_imagen}" target="_blank">
+            <a href="fotos/{imagen}" target="_blank">
                 🔍 Ver imagen completa
             </a>
         """
